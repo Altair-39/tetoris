@@ -1,5 +1,5 @@
 [package]
-name = "tetris"
+name = "tetoris"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,4 @@ edition = "2021"
 ratatui = "0.29.0"  
 crossterm = "0.28.1"  
 rand = "0.9.0"
-
+rayon = "1.10.0"

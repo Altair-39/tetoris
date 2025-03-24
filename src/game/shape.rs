@@ -5,6 +5,7 @@ use rand::seq::SliceRandom;
 pub struct Shape {
     pub array: Vec<Vec<u8>>,
     pub width: usize,
+    pub height: usize,
     pub row: isize,
     pub col: isize,
     pub color: Color,
@@ -12,11 +13,16 @@ pub struct Shape {
 
 impl Shape {
     pub fn new(shape_data: &[&[u8]], color: Color) -> Self {
-        let array = shape_data.iter().map(|row| row.to_vec()).collect();
-        let width = shape_data.len();
+        let array = shape_data
+            .iter()
+            .map(|row| row.to_vec())
+            .collect::<Vec<Vec<u8>>>();
+        let height = shape_data.len();
+        let width = shape_data[0].len();
         Self {
             array,
             width,
+            height,
             row: 0,
             col: 5 - width as isize / 2,
             color,
@@ -24,20 +30,21 @@ impl Shape {
     }
 
     pub fn rotate(&mut self) {
-        let mut new_array = vec![vec![0; self.width]; self.width];
-        for i in 0..self.width {
+        let mut new_array = vec![vec![0; self.height]; self.width];
+        for i in 0..self.height {
             for j in 0..self.width {
-                new_array[i][j] = self.array[self.width - j - 1][i];
+                new_array[j][self.height - 1 - i] = self.array[i][j];
             }
         }
+
         self.array = new_array;
+        std::mem::swap(&mut self.width, &mut self.height);
     }
 }
 
 pub struct ShapeGenerator {
     shapes: Vec<Shape>,
     permutation: Vec<Shape>,
-    rng: rand::rngs::ThreadRng,
 }
 
 impl ShapeGenerator {
@@ -45,20 +52,18 @@ impl ShapeGenerator {
         ShapeGenerator {
             shapes,
             permutation: Vec::new(),
-            rng: rand::rng(),
         }
     }
 
-    // Generate the permutation using Fisher-Yates Shuffle
     pub fn generate_permutation(&mut self) -> Vec<Shape> {
+        let mut rng = rand::rng();
         let mut shapes = self.shapes.clone();
-        shapes.shuffle(&mut self.rng); // Shuffle the shapes vector in place
+        shapes.shuffle(&mut rng);
         self.permutation = shapes;
         self.permutation.clone()
     }
 
-    // Public method to get the next shape from the permutation
     pub fn next_shape(&mut self) -> Option<Shape> {
-        self.permutation.pop() // Pop the last shape from the permutation
+        self.permutation.pop()
     }
 }
