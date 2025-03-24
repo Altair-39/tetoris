@@ -1,3 +1,4 @@
+use crate::game::control::{COLS, ROWS};
 use crate::game::Game;
 use ratatui::{
     layout::{Alignment, Rect},
@@ -152,36 +153,58 @@ pub fn render_pause_menu(frame: &mut Frame) {
     frame.render_widget(paragraph, area);
 }
 /// Render the main game area (game board)
+
+fn precompute_active_cells(game: &Game) -> Vec<Vec<bool>> {
+    let mut active_cells = vec![vec![false; COLS]; ROWS];
+
+    // Mark the active cells of the shape on the game board
+    for x in 0..game.current.width {
+        for y in 0..game.current.width {
+            if game.current.array[x][y] == 1 {
+                let shape_row = game.current.row + x as isize;
+                let shape_col = game.current.col + y as isize;
+
+                if shape_row >= 0
+                    && shape_col >= 0
+                    && shape_row < ROWS as isize
+                    && shape_col < COLS as isize
+                {
+                    active_cells[shape_row as usize][shape_col as usize] = true;
+                }
+            }
+        }
+    }
+
+    active_cells
+}
+
 fn render_game_area(frame: &mut ratatui::Frame, game: &Game) {
-    let mut output = String::new();
+    let active_cells = precompute_active_cells(game);
+
+    let mut output = Vec::with_capacity((20 * 11 * 2) + 20); // Preallocate memory
 
     for i in 0..20 {
         for j in 0..11 {
-            let mut cell = if game.table[i][j] == 1 { "O" } else { "." };
-            for x in 0..game.current.width {
-                for y in 0..game.current.width {
-                    let shape_row = game.current.row + x as isize;
-                    let shape_col = game.current.col + y as isize;
+            let mut cell = b'.'; // Default to empty space
 
-                    if shape_row >= 0
-                        && shape_col >= 0
-                        && shape_row as usize == i
-                        && shape_col as usize == j
-                        && game.current.array[x][y] == 1
-                    {
-                        cell = "O";
-                    }
-                }
+            // Check if the cell is occupied by the active shape or the game board
+            if game.table[i][j] == 1 || active_cells[i][j] {
+                cell = b'O'; // Active cell in the game or active shape cell
             }
-            output.push_str(cell);
-            output.push(' ');
+
+            output.push(cell);
+            output.push(b' '); // Space for readability
         }
-        output.push('\n');
+        output.push(b'\n');
     }
 
-    output.push_str(&format!("\nScore: {}\n", game.score));
+    // Append score using efficient formatting
+    output.extend_from_slice(format!("\nScore: {}\n", game.score).as_bytes());
 
-    let paragraph = Paragraph::new(output)
+    // Convert Vec<u8> to String once
+    let output_str = String::from_utf8(output).unwrap();
+
+    let paragraph = Paragraph::new(output_str)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::White));
 
@@ -189,31 +212,36 @@ fn render_game_area(frame: &mut ratatui::Frame, game: &Game) {
 }
 
 /// Render the preview of the next shape
+
 fn render_next_shape_preview(frame: &mut ratatui::Frame, game: &Game) {
-    let mut preview_output = String::new();
-    preview_output.push_str("\nNext Shape:\n");
+    let mut output = Vec::with_capacity(game.next_shape.width * game.next_shape.width * 2 + 15);
+
+    output.extend_from_slice(b"\nNext Shape:\n");
+
     for i in 0..game.next_shape.width {
         for j in 0..game.next_shape.width {
             let cell = if game.next_shape.array[i][j] == 1 {
-                "O"
+                b'O'
             } else {
-                "."
+                b'.'
             };
-            preview_output.push_str(cell);
-            preview_output.push(' ');
+            output.push(cell);
+            output.push(b' '); // Add space for spacing
         }
-        preview_output.push('\n');
+        output.push(b'\n');
     }
+
+    let preview_output = String::from_utf8(output).unwrap(); // Convert once
 
     let preview_paragraph = Paragraph::new(preview_output)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::White));
 
     let preview_area = ratatui::layout::Rect::new(
-        frame.area().width - 20, // x-position
-        0,                       // y-position
-        20,                      // width
-        7,                       // height (enough to show the next shape preview)
+        frame.area().width.saturating_sub(20), // Avoid negative overflow
+        0,
+        20,
+        7,
     );
 
     frame.render_widget(preview_paragraph, preview_area);
@@ -221,34 +249,38 @@ fn render_next_shape_preview(frame: &mut ratatui::Frame, game: &Game) {
 
 /// Render the current falling shape with its unique color
 fn render_falling_shape(frame: &mut ratatui::Frame, game: &Game) {
-    let mut output_with_color = String::new();
-    for i in 0..20 {
-        for j in 0..11 {
-            let mut cell = if game.table[i][j] == 1 { "O" } else { "." };
-            for x in 0..game.current.width {
-                for y in 0..game.current.width {
-                    let shape_row = game.current.row + x as isize;
-                    let shape_col = game.current.col + y as isize;
+    let mut output = Vec::with_capacity(20 * 11 * 2);
 
-                    if shape_row >= 0
-                        && shape_col >= 0
-                        && shape_row as usize == i
-                        && shape_col as usize == j
-                        && game.current.array[x][y] == 1
-                    {
-                        cell = "O";
-                    }
+    let mut shape_cells = vec![];
+    for x in 0..game.current.width {
+        for y in 0..game.current.width {
+            if game.current.array[x][y] == 1 {
+                let shape_row = (game.current.row + x as isize) as usize;
+                let shape_col = (game.current.col + y as isize) as usize;
+                if shape_row < 20 && shape_col < 11 {
+                    shape_cells.push((shape_row, shape_col));
                 }
             }
-            output_with_color.push_str(cell);
-            output_with_color.push(' ');
         }
-        output_with_color.push('\n');
     }
+
+    for i in 0..20 {
+        for j in 0..11 {
+            let mut cell = if game.table[i][j] == 1 { b'O' } else { b'.' };
+            if shape_cells.contains(&(i, j)) {
+                cell = b'O';
+            }
+            output.push(cell);
+            output.push(b' ');
+        }
+        output.push(b'\n');
+    }
+
+    let output_with_color = String::from_utf8(output).unwrap();
 
     let game_area_paragraph = Paragraph::new(output_with_color)
         .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(game.current.color.into())); // Use the shape's unique color
+        .style(Style::default().fg(game.current.color.into()));
 
     frame.render_widget(game_area_paragraph, frame.area());
 }

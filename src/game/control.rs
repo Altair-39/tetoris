@@ -2,8 +2,8 @@ use crate::game::shape::{Shape, ShapeGenerator};
 use crossterm::style::Color;
 use std::time::{Duration, Instant};
 
-const ROWS: usize = 20;
-const COLS: usize = 11;
+pub const ROWS: usize = 20;
+pub const COLS: usize = 11;
 
 pub struct Game {
     pub table: [[u8; COLS]; ROWS],
